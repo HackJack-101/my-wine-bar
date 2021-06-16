@@ -1,21 +1,27 @@
-import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import * as React from 'react';
+import { DefaultTheme, Provider as PaperProvider } from 'react-native-paper';
+import * as Sentry from 'sentry-expo';
 
-export default function App() {
-  return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
-}
+import App from './src/App';
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+Sentry.init({
+    dsn: 'https://f5d3e957ff244f55ae4fc3a5c355a067@o509457.ingest.sentry.io/5604388',
+    enableInExpoDevelopment: true,
+    debug: true,
 });
+
+const theme = {
+    ...DefaultTheme,
+    colors: {
+        ...DefaultTheme.colors,
+        accent: '#671b1b',
+    },
+};
+
+export default function Main() {
+    return (
+        <PaperProvider theme={theme}>
+            <App />
+        </PaperProvider>
+    );
+}
