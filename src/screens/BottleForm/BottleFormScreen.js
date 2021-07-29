@@ -1,20 +1,12 @@
 import React, { useState, useContext, useEffect } from 'react';
-import {
-    KeyboardAvoidingView,
-    Text,
-    TextInput,
-    View,
-    Switch,
-    ScrollView,
-    Image,
-    Pressable,
-    Platform,
-} from 'react-native';
-import { Button } from 'react-native-elements';
+import { KeyboardAvoidingView, Text, View, Switch, ScrollView, Image, Pressable, Platform } from 'react-native';
+import { Button, Input as TextInput } from 'react-native-elements';
+import { Button as PaperButton } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import uuid from 'uuid-random';
 
-import { addBottle } from '../../entities/bottle.entity';
+import { addBottle, getS3UploadImage, uploadImage, addOne, removeOne } from '../../entities/bottle.entity';
 import i18n from '../../data/i18n';
 import styles from './styles';
 import SelectComponent from '../../components/Select/select.component';
@@ -25,7 +17,9 @@ import {
     getCastlePlaceholder,
     getTerroirPlaceholder,
     getABVPlaceholder,
+    getVolumePlaceholder,
 } from '../../data/placeholders';
+import { listCellars } from '../../entities/cellar.entity';
 
 export default function BottleFormScreen({ navigation, route }) {
     const _ean13 = route.params ? route.params.ean13 || '' : '';
@@ -35,7 +29,8 @@ export default function BottleFormScreen({ navigation, route }) {
     const [awards, onChangeAwards] = useState('');
     const [castle, onChangeCastle] = useState('');
     const [category, onChangeCategory] = useState();
-    const [cellar, onChangeCellar] = useState();
+    const [cellar, onChangeCellar] = useState('');
+    const [cellars, onChangeCellars] = useState([]);
     const [composition, onChangeComposition] = useState('');
     const [conservation, onChangeConservation] = useState('');
     const [containsSulfites, onChangeContainsSulfites] = useState(false);
@@ -45,11 +40,12 @@ export default function BottleFormScreen({ navigation, route }) {
     const [isOrganic, onChangeIsOrganic] = useState(false);
     const [notes, onChangeNotes] = useState();
     const [otherType, onChangeOtherType] = useState();
-    const [photo, onChangePhoto] = useState();
-    const [quantity, onChangeQuantity] = useState();
+    const [photo, onChangePhoto] = useState(); // Not used for now. Maybe for edition
+    const [quantity, onChangeQuantity] = useState(1);
     const [tastingSuggestions, onChangeTastingSuggestions] = useState();
     const [terroir, onChangeTerroir] = useState();
     const [type, onChangeType] = useState('wine');
+    const [volume, onChangeVolume] = useState();
     const [wineColor, onChangeWineColor] = useState('red');
     const [year, onChangeYear] = useState();
 
@@ -57,6 +53,12 @@ export default function BottleFormScreen({ navigation, route }) {
 
     useEffect(() => {
         (async () => {
+            const _cellars = await listCellars();
+            onChangeCellars(_cellars.map((c) => ({ label: `${c.name} (${c.creator.name})`, value: c._id })));
+            if (_cellars.length > 0) {
+                onChangeCellar(_cellars[0]._id);
+            }
+
             if (Platform.OS !== 'web') {
                 const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
                 if (status !== 'granted') {
@@ -77,7 +79,7 @@ export default function BottleFormScreen({ navigation, route }) {
         console.log(result);
 
         if (!result.cancelled) {
-            setImage(result.uri);
+            setImage(result);
         }
     };
 
@@ -92,7 +94,7 @@ export default function BottleFormScreen({ navigation, route }) {
         console.log(result);
 
         if (!result.cancelled) {
-            setImage(result.uri);
+            setImage(result);
         }
     };
 
@@ -118,24 +120,37 @@ export default function BottleFormScreen({ navigation, route }) {
     const countries = Object.keys(names).map((key) => ({ label: names[key], value: key }));
 
     const addNewBottle = async (data) => {
-        await addBottle(data);
+        const ext = image.uri.substring(image.uri.lastIndexOf('.') + 1);
+
+        const key = uuid() + '.' + ext;
+
+        await getS3UploadImage(key)
+            .then((params) => {
+                return uploadImage(params, image, key, ext);
+            })
+            .then((photoURL) => {
+                return addBottle({ ...data, photo: photoURL });
+            })
+            .catch(console.err);
         return navigation.navigate('Home');
     };
 
     return (
-        <KeyboardAvoidingView style={styles.containerView} behavior="height">
+        <KeyboardAvoidingView style={styles.containerView} behavior="height" keyboardVerticalOffset={100}>
             <ScrollView style={styles.loginScreenContainer}>
                 <View style={styles.loginFormView}>
                     <Text style={styles.logoText}>{i18n.t('newBottle')}</Text>
-
-                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                        <Pressable onPress={pickImage}>
-                            <MaterialCommunityIcons name="image-plus" size={42} color="black" />
-                        </Pressable>
-                        <Pressable onPress={takePicture}>
-                            <MaterialCommunityIcons name="camera-plus-outline" size={42} color="black" />
-                        </Pressable>
-                        {image && <Image source={{ uri: image }} style={{ width: 200, height: 200 }} />}
+                    <View
+                        style={{ flex: 1, alignItems: 'center', justifyContent: 'space-around', flexDirection: 'row' }}>
+                        <PaperButton mode="outlined" onPress={pickImage}>
+                            <MaterialCommunityIcons name="image-plus" size={32} color="black" />
+                        </PaperButton>
+                        <PaperButton mode="outlined" onPress={takePicture}>
+                            <MaterialCommunityIcons name="camera-plus-outline" size={32} color="black" />
+                        </PaperButton>
+                    </View>
+                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' }}>
+                        {image && <Image source={{ uri: image.uri }} style={{ width: 200, height: 200 }} />}
                     </View>
 
                     <Text>Type d'alcool</Text>
@@ -143,9 +158,10 @@ export default function BottleFormScreen({ navigation, route }) {
 
                     {type === 'other' && (
                         <TextInput
+                            mode="outlined"
                             placeholder={i18n.t('type')}
                             placeholderColor="#c4c3cb"
-                            style={styles.loginFormTextInput}
+                            style={styles.textInput}
                             onChangeText={(text) => onChangeOtherType(text)}
                             value={otherType}
                             autoCompleteType="name"
@@ -164,63 +180,52 @@ export default function BottleFormScreen({ navigation, route }) {
                         </>
                     )}
 
-                    <Text>{i18n.t('category')}</Text>
                     <TextInput
+                        mode="outlined"
+                        label={i18n.t('category')}
                         placeholder={getCategoryPlaceholder(type)}
                         placeholderColor="#c4c3cb"
-                        style={styles.loginFormTextInput}
+                        style={styles.textInput}
                         onChangeText={(text) => onChangeCategory(text)}
                         value={category}
                         autoCompleteType="name"
                         textContentType="name"
-                        autoCapitalize="words"
                     />
 
-                    <Text>{i18n.t('name')}</Text>
                     <TextInput
+                        label={i18n.t('name')}
+                        mode="outlined"
                         placeholder={getNamePlaceholder(type)}
                         placeholderColor="#c4c3cb"
-                        style={styles.loginFormTextInput}
+                        style={styles.textInput}
                         onChangeText={(text) => onChangeName(text)}
                         value={name}
                         autoCompleteType="name"
                         textContentType="name"
-                        autoCapitalize="words"
                     />
 
                     {type !== 'beer' && (
                         <>
-                            <Text>{i18n.t('castle')}</Text>
                             <TextInput
+                                label={i18n.t('castle')}
+                                mode="outlined"
                                 placeholder={getCastlePlaceholder(type)}
                                 placeholderColor="#c4c3cb"
-                                style={styles.loginFormTextInput}
+                                style={styles.textInput}
                                 onChangeText={(text) => onChangeCastle(text)}
                                 value={castle}
                                 autoCompleteType="name"
                                 textContentType="name"
-                                autoCapitalize="words"
                             />
                         </>
                     )}
 
-                    <Text>{i18n.t('terroir')}</Text>
                     <TextInput
-                        placeholder={getTerroirPlaceholder(type)}
-                        placeholderColor="#c4c3cb"
-                        style={styles.loginFormTextInput}
-                        onChangeText={(text) => onChangeTerroir(text)}
-                        value={terroir}
-                        autoCompleteType="name"
-                        textContentType="name"
-                        autoCapitalize="words"
-                    />
-
-                    <Text>{i18n.t('year')}</Text>
-                    <TextInput
+                        label={i18n.t('year')}
+                        mode="outlined"
                         placeholder={'1995, 2006, 2009, 2012...'}
                         placeholderColor="#c4c3cb"
-                        style={styles.loginFormTextInput}
+                        style={styles.textInput}
                         onChangeText={(text) => onChangeYear(text)}
                         value={year}
                         keyboardType="numeric"
@@ -229,16 +234,41 @@ export default function BottleFormScreen({ navigation, route }) {
                         autoCapitalize="none"
                     />
 
+                    <TextInput
+                        label={i18n.t('terroir')}
+                        mode="outlined"
+                        placeholder={getTerroirPlaceholder(type)}
+                        placeholderColor="#c4c3cb"
+                        style={styles.textInput}
+                        onChangeText={(text) => onChangeTerroir(text)}
+                        value={terroir}
+                        autoCompleteType="name"
+                        textContentType="name"
+                    />
+
                     <Text>{i18n.t('country')}</Text>
                     <SelectComponent onChangeValue={onChangeCountry} selected={country} values={countries} />
 
-                    <Text>{i18n.t('abv')}</Text>
                     <TextInput
+                        label={i18n.t('abv')}
+                        mode="outlined"
                         placeholder={getABVPlaceholder(type)}
-                        placeholderColor="#c4c3cb"
-                        style={styles.loginFormTextInput}
+                        style={styles.textInput}
                         onChangeText={(text) => onChangeABV(text)}
                         value={abv}
+                        keyboardType="numeric"
+                        autoCompleteType="off"
+                        textContentType="none"
+                        autoCapitalize="none"
+                    />
+
+                    <TextInput
+                        label={i18n.t('volume')}
+                        mode="outlined"
+                        placeholder={getVolumePlaceholder(type)}
+                        style={styles.textInput}
+                        onChangeText={(text) => onChangeVolume(text)}
+                        value={volume}
                         keyboardType="numeric"
                         autoCompleteType="off"
                         textContentType="none"
@@ -275,11 +305,12 @@ export default function BottleFormScreen({ navigation, route }) {
                         </View>
                     )}
 
-                    <Text>{i18n.t('barcode')}</Text>
                     <TextInput
+                        label={i18n.t('barcode')}
+                        mode="outlined"
                         placeholder="3520727918800"
                         placeholderColor="#c4c3cb"
-                        style={styles.loginFormTextInput}
+                        style={styles.textInput}
                         onChangeText={(text) => onChangeEAN13(text)}
                         value={ean13}
                         keyboardType="numeric"
@@ -288,74 +319,83 @@ export default function BottleFormScreen({ navigation, route }) {
                         autoCapitalize="none"
                     />
 
-                    <Text>{i18n.t('description')}</Text>
                     <TextInput
-                        style={styles.loginFormTextInput}
+                        label={i18n.t('description')}
+                        mode="outlined"
+                        style={styles.textInput}
                         onChangeText={(text) => onChangeDescription(text)}
                         value={description}
-                        multiline={true}
+                        multiline
                         autoCompleteType="off"
                         textContentType="none"
-                        autoCapitalize="sentences"
-                        numberOfLines={5}
-                    />
-                    <Text>{i18n.t('composition')}</Text>
-                    <TextInput
-                        style={styles.loginFormTextInput}
-                        onChangeText={(text) => onChangeComposition(text)}
-                        value={composition}
-                        multiline={true}
-                        autoCompleteType="off"
-                        textContentType="none"
-                        autoCapitalize="sentences"
                         numberOfLines={3}
-                    />
-                    <Text>{i18n.t('awards')}</Text>
-                    <TextInput
-                        style={styles.loginFormTextInput}
-                        onChangeText={(text) => onChangeAwards(text)}
-                        value={awards}
-                        multiline={true}
-                        autoCompleteType="off"
-                        textContentType="none"
-                        autoCapitalize="sentences"
-                        numberOfLines={3}
-                    />
-                    <Text>{i18n.t('conservation')}</Text>
-                    <TextInput
-                        style={styles.loginFormTextInput}
-                        onChangeText={(text) => onChangeConservation(text)}
-                        value={conservation}
-                        multiline={true}
-                        autoCompleteType="off"
-                        textContentType="none"
-                        autoCapitalize="sentences"
-                        numberOfLines={5}
-                    />
-                    <Text>{i18n.t('tastingSuggestions')}</Text>
-                    <TextInput
-                        style={styles.loginFormTextInput}
-                        onChangeText={(text) => onChangeTastingSuggestions(text)}
-                        value={tastingSuggestions}
-                        multiline={true}
-                        autoCompleteType="off"
-                        textContentType="none"
-                        autoCapitalize="sentences"
-                        numberOfLines={5}
-                    />
-                    <Text>{i18n.t('notes')}</Text>
-                    <TextInput
-                        style={styles.loginFormTextInput}
-                        onChangeText={(text) => onChangeNotes(text)}
-                        value={notes}
-                        multiline={true}
-                        autoCompleteType="off"
-                        textContentType="none"
-                        autoCapitalize="sentences"
-                        numberOfLines={5}
                     />
 
+                    <TextInput
+                        label={i18n.t('composition')}
+                        mode="outlined"
+                        style={styles.textInput}
+                        onChangeText={(text) => onChangeComposition(text)}
+                        value={composition}
+                        multiline
+                        autoCompleteType="off"
+                        textContentType="none"
+                        numberOfLines={3}
+                    />
+
+                    <TextInput
+                        label={i18n.t('awards')}
+                        mode="outlined"
+                        style={styles.textInput}
+                        onChangeText={(text) => onChangeAwards(text)}
+                        value={awards}
+                        multiline
+                        autoCompleteType="off"
+                        textContentType="none"
+                        numberOfLines={3}
+                    />
+
+                    <TextInput
+                        label={i18n.t('conservation')}
+                        mode="outlined"
+                        style={styles.textInput}
+                        onChangeText={(text) => onChangeConservation(text)}
+                        value={conservation}
+                        multiline
+                        autoCompleteType="off"
+                        textContentType="none"
+                        numberOfLines={3}
+                    />
+
+                    <TextInput
+                        label={i18n.t('tastingSuggestions')}
+                        mode="outlined"
+                        style={styles.textInput}
+                        onChangeText={(text) => onChangeTastingSuggestions(text)}
+                        value={tastingSuggestions}
+                        multiline
+                        autoCompleteType="off"
+                        textContentType="none"
+                        numberOfLines={3}
+                    />
+
+                    <TextInput
+                        label={i18n.t('notes')}
+                        mode="outlined"
+                        style={styles.textInput}
+                        onChangeText={(text) => onChangeNotes(text)}
+                        value={notes}
+                        multiline
+                        autoCompleteType="off"
+                        textContentType="none"
+                        numberOfLines={3}
+                    />
+
+                    <Text>{i18n.t('cellar')}</Text>
+                    <SelectComponent onChangeValue={onChangeCellar} selected={cellar} values={cellars} />
+
                     <Button
+                        mode="contained"
                         buttonStyle={styles.loginButton}
                         onPress={() =>
                             addNewBottle({
@@ -374,7 +414,6 @@ export default function BottleFormScreen({ navigation, route }) {
                                 isOrganic,
                                 notes,
                                 otherType,
-                                photo,
                                 quantity,
                                 tastingSuggestions,
                                 terroir,

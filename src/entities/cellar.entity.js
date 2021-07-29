@@ -58,3 +58,23 @@ export async function getSharedCellars() {
         console.log(error);
     }
 }
+
+export async function listCellars() {
+    try {
+        const token = await getToken();
+        if (token) {
+            let config = {
+                method: 'get',
+                url: 'https://wine-bar-api.cleverapps.io/api/v1/cellar/list',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            };
+
+            const { data } = await axios(config);
+            return data || [];
+        }
+    } catch (error) {
+        console.log(error);
+    }
+}

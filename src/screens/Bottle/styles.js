@@ -3,6 +3,9 @@ import { StyleSheet, Dimensions } from 'react-native';
 const { width: viewportWidth } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
+    card: {
+        marginTop: 10,
+    },
     container: {
         backgroundColor: 'white',
         flex: 1,
@@ -12,8 +15,10 @@ const styles = StyleSheet.create({
         paddingRight: 10,
         paddingLeft: 10,
         paddingBottom: 20,
+        backgroundColor: '#ffffff',
     },
     photoContainer: {
+        marginTop: 10,
         minHeight: 400,
     },
     carousel: {},
@@ -98,7 +103,16 @@ const styles = StyleSheet.create({
     wineName: {
         flex: 1,
         fontSize: 28,
-        margin: 10,
+        marginTop: 10,
+        marginBottom: 5,
+        fontWeight: 'bold',
+        color: 'black',
+        textAlign: 'center',
+    },
+    wineCastle: {
+        flex: 1,
+        fontSize: 20,
+        marginBottom: 5,
         fontWeight: 'bold',
         color: 'black',
         textAlign: 'center',

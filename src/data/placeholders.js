@@ -88,3 +88,21 @@ export function getABVPlaceholder(type) {
             return '12°';
     }
 }
+
+export function getVolumePlaceholder(type) {
+    switch (type) {
+        case 'wine':
+            return '750';
+        case 'beer':
+            return '330';
+        case 'cider':
+            return '750';
+        case 'spirit':
+            return '500';
+        case 'liqueur':
+            return '500';
+        case 'other':
+        default:
+            return '250';
+    }
+}

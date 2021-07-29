@@ -4,7 +4,10 @@ import { Picker } from '@react-native-picker/picker';
 
 import styles from './styles';
 
-export default function SelectComponent({ values, selected, onChangeValue }) {
+export default function SelectComponent({ values, selected, onChangeValue, debug = false }) {
+    if (debug) {
+        console.log(values);
+    }
     if (Platform.OS === 'ios') {
         let title = selected;
         const foundValue = values.find(({ value }) => value === selected);

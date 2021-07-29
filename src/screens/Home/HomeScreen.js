@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, View, Image } from 'react-native';
 import { Card, Title, Paragraph } from 'react-native-paper';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import styles from './styles';
 import { getCountryFlag } from '../../services/services';
@@ -9,14 +10,18 @@ import { getCellar, getSharedCellars } from '../../entities/cellar.entity';
 
 export default function HomeScreen({ navigation }) {
     const [bottles, onChangeBottles] = useState([]);
+    const [refreshing, onChangeRefreshing] = useState(true);
 
     useEffect(() => {
-        (async () => {
-            const defaultCellar = await getCellar();
-            const sharedCellars = await getSharedCellars();
-            onChangeBottles(defaultCellar.concat(sharedCellars));
-        })();
+        getList();
     }, []);
+
+    const getList = async () => {
+        const defaultCellar = await getCellar();
+        const sharedCellars = await getSharedCellars();
+        onChangeBottles(defaultCellar.concat(sharedCellars));
+        onChangeRefreshing(false);
+    };
 
     const onPressBottle = (item) => {
         navigation.navigate('Bottle', { item });
@@ -62,6 +67,8 @@ export default function HomeScreen({ navigation }) {
                 data={bottles}
                 renderItem={renderBottle}
                 keyExtractor={(item) => `${item._id}`}
+                refreshing={refreshing}
+                onRefresh={getList}
             />
             <ActionsButton onScan={onScanAction} onAddBottle={onAddBottleAction} />
         </View>

@@ -1,16 +1,33 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, Text, View, Image, useWindowDimensions, SafeAreaView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Card, Title, Paragraph } from 'react-native-paper';
 
 import styles from './styles';
-import { getBottleType } from '../../services/services';
-import RemoveBottle from '../../components/RemoveButton/RemoveBottle';
+import { getBottleType, getCountryFlag } from '../../services/services';
+import Quantity from '../../components/Quantity/Quantity';
+import i18n from '../../data/i18n';
+import { addOne, removeOne } from '../../entities/bottle.entity';
 
 export default function BottleScreen(props) {
     const { route, navigation } = props;
     const { item } = route.params;
 
+    const [quantity, onQuantityChange] = useState(item.quantity);
+
     const window = useWindowDimensions();
+
+    const addOneBottle = async () => {
+        onQuantityChange(quantity + 1);
+        await addOne(item._id);
+    };
+
+    const removeOneBottle = async () => {
+        if (quantity > 0) {
+            onQuantityChange(quantity - 1);
+            await removeOne(item._id);
+        }
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -24,11 +41,37 @@ export default function BottleScreen(props) {
                 <View style={styles.infoWineContainer}>
                     <View style={{ marginBottom: 10 }}>
                         <Text style={styles.wineName}>{item.name}</Text>
-                        <Text style={styles.wineName}>{item.year}</Text>
 
-                        <View style={styles.infoContainerCentered}>
-                            <MaterialCommunityIcons name="fruit-grapes" size={24} color="black" />
-                            <Text style={styles.infoWine}>{item.terroir} </Text>
+                        <Text style={styles.wineCastle}>{item.castle}</Text>
+
+                        {item.terroir && (
+                            <View style={styles.infoContainerCentered}>
+                                <MaterialCommunityIcons name="fruit-grapes" size={24} color="black" />
+                                <Text style={styles.infoWine}>{item.terroir} {getCountryFlag(item.country)}</Text>
+                            </View>
+                        )}
+
+                        <View style={{ flex: 1, flexDirection: 'row', padding: 5, justifyContent: 'space-between' }}>
+                            {item.abv && (
+                                <View style={styles.infoContainerCentered}>
+                                    <MaterialCommunityIcons name="percent-outline" size={24} color="black" />
+                                    <Text style={styles.infoWine}>{item.abv.toFixed(1)}</Text>
+                                </View>
+                            )}
+
+                            {item.year && (
+                                <View style={styles.infoContainerCentered}>
+                                    <MaterialCommunityIcons name="calendar-blank" size={24} color="black" />
+                                    <Text style={styles.infoWine}>{item.year}</Text>
+                                </View>
+                            )}
+
+                            {item.volume && (
+                                <View style={styles.infoContainerCentered}>
+                                    <MaterialCommunityIcons name="bottle-wine" size={24} color="black" />
+                                    <Text style={styles.infoWine}>{item.volume} mL</Text>
+                                </View>
+                            )}
                         </View>
 
                         <View
@@ -38,62 +81,43 @@ export default function BottleScreen(props) {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                             }}>
-                            {/*<AddBottle />*/}
-                            <RemoveBottle />
+                            <Quantity quantity={quantity} onPlusAction={addOneBottle} onMinusAction={removeOneBottle} />
                         </View>
                     </View>
-                    <View
-                        style={{
-                            flex: 1,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginTop: 10,
-                            marginBottom: 5,
-                        }}>
-                        <Text style={{ fontWeight: 'bold', fontSize: 20 }}>Informations</Text>
-                    </View>
 
-                    <View style={styles.descriptionContainer}>
-                        <Text style={styles.subInfoTitle}>{getBottleType(item)}</Text>
-                    </View>
-                    <View style={styles.descriptionContainer}>
-                        <Text style={{ fontSize: 16, textAlign: 'justify' }}>{item.description}</Text>
-                    </View>
+                    <Card mode="outlined" style={styles.card}>
+                        <Card.Title title={getBottleType(item)} />
+                        <Card.Content>
+                            <Paragraph>{item.description}</Paragraph>
+                        </Card.Content>
+                    </Card>
 
-                    <View style={styles.subInfoContainer}>
-                        <Text style={styles.subInfoTitle}>Volume d'alcool :</Text>
-                        <Text style={{ fontSize: 16 }}>{item.abv.toFixed(1)}</Text>
-                    </View>
-
-                    {item.awards && item.awards.length > 0 && (
-                        <View style={styles.subInfoContainer}>
-                            <Text style={styles.subInfoTitle}>Récompenses :</Text>
-                            <Text style={{ fontSize: 16 }}>{item.awards.join(',')}</Text>
-                        </View>
-                    )}
-
-                    {item.conservation && (
-                        <>
-                            <View style={styles.subInfoContainer}>
-                                <Text style={styles.subInfoTitle}>Conservation :</Text>
-                            </View>
-                            <View style={styles.minorDescriptionContainer}>
-                                <Text style={{ fontSize: 16 }}>{item.conservation}</Text>
-                            </View>
-                        </>
-                    )}
+                    {item.conservation ? (
+                        <Card mode="outlined" style={styles.card}>
+                            <Card.Title title={i18n.t('conservation')} />
+                            <Card.Content>
+                                <Paragraph>{item.conservation}</Paragraph>
+                            </Card.Content>
+                        </Card>
+                    ) : null}
 
                     {item.tastingSuggestions && (
-                        <>
-                            <View style={styles.subInfoContainer}>
-                                <Text style={styles.subInfoTitle}>Conseils de dégustation :</Text>
-                            </View>
-                            <View style={styles.minorDescriptionContainer}>
-                                <Text style={{ fontSize: 16 }}>{item.tastingSuggestions}</Text>
-                            </View>
-                        </>
+                        <Card mode="outlined" style={styles.card}>
+                            <Card.Title title={i18n.t('tastingSuggestions')} />
+                            <Card.Content>
+                                <Paragraph>{item.tastingSuggestions}</Paragraph>
+                            </Card.Content>
+                        </Card>
                     )}
+
+                    {item.awards ? (
+                        <Card mode="outlined" style={styles.card}>
+                            <Card.Title title={i18n.t('awards')} />
+                            <Card.Content>
+                                <Paragraph>{item.awards}</Paragraph>
+                            </Card.Content>
+                        </Card>
+                    ) : null}
 
                     <View
                         style={{
@@ -109,7 +133,7 @@ export default function BottleScreen(props) {
 
                     {item.notes && (
                         <View style={styles.subInfoContainer}>
-                            <Text style={styles.subInfoTitle}>Notes :</Text>
+                            <Text style={styles.subInfoTitle}>{i18n.t('notes')} :</Text>
                             <Text style={{ fontSize: 16 }}>{item.notes}</Text>
                         </View>
                     )}
@@ -117,10 +141,6 @@ export default function BottleScreen(props) {
                     <View style={styles.subInfoContainer}>
                         <Text style={styles.subInfoTitle}>Emplacement :</Text>
                         <Text style={{ fontSize: 16 }}>{item.cellar}</Text>
-                    </View>
-                    <View style={styles.subInfoContainer}>
-                        <Text style={styles.subInfoTitle}>Quantité :</Text>
-                        <Text style={{ fontSize: 16 }}>{item.quantity}</Text>
                     </View>
                 </View>
             </ScrollView>

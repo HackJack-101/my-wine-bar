@@ -2,7 +2,7 @@
     "expo": {
         "name": "my-wine-bar",
         "slug": "my-wine-bar",
-        "version": "0.0.1",
+        "version": "0.0.2",
         "orientation": "portrait",
         "icon": "./assets/icon.png",
         "splash": {
